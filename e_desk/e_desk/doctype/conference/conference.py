@@ -94,7 +94,13 @@ class Conference(WebsiteGenerator):
 		now = frappe.utils.now_datetime()
 		end_date = frappe.utils.get_datetime(self.end_date) if self.end_date else None
 
-		context.show_e_ticket = bool(end_date and now <= end_date)
+		participant = get_participant_status(self.name)
+		context.participant_status = participant.get("status")
+		context.show_e_ticket = bool(
+			end_date
+			and now <= end_date
+			and context.participant_status in ("Registered", "Approved")
+		)
 		context.is_registration_closed = bool(
 			self.registration_close_date
 			and get_datetime(self.registration_close_date) < now_datetime()
@@ -125,6 +131,17 @@ def is_user_registered(event_name):
             limit=1,
         )
     )
+def get_participant_status(event_name):
+    user = frappe.session.user
+    if user == "Guest":
+        return {}
+
+    return frappe.db.get_value(
+        "Participant",
+        {"event": event_name, "user": user},
+        ["status", "custom_registration_status"],
+        as_dict=True,
+    ) or {}
 
 def has_exhibitor():
     has_exhibitor = frappe.db.get_value(
